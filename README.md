@@ -57,7 +57,7 @@ To use a custom domain, add it to the Worker in the Cloudflare dashboard.
   - Reconnect with your saved seat; game state is rehydrated from the server
   - Rematch and back-to-lobby flows
 - **A cinematic table** — velvet felt, hand-drawn SVG crests, gold-stamped cards with 3D flips, animated coins, challenge flashes, reveal stamps and a victory confetti storm
-- **Synthesized sound design** — coins, flips, challenges, gongs and a victory fanfare, generated in the browser with no audio assets
+- **Casino-table sound design** — synthesized chip clinks, card riffles, roulette ticks, table bells and a jackpot fanfare, generated in the browser with no audio assets
 - **Responsive** — desktop, tablet, phone portrait and phone landscape, with compact six-player layouts and a slide-up table log
 - **A running table log** with every claim, challenge and consequence, plus a court reference card
 
