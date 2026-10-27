@@ -49,6 +49,8 @@ class CoupUI {
     this.modalDismissible = false;
     this.handlers = {};
     this.lastLogCount = 0;
+    this.mode = 'solo';
+    this.promptTimerEl = null;
 
     this.bindStatic();
     this.updateSoundButton();
@@ -56,6 +58,10 @@ class CoupUI {
 
   setHandlers(handlers) {
     this.handlers = handlers || {};
+  }
+
+  setMode(mode = 'solo') {
+    this.mode = mode === 'online' ? 'online' : 'solo';
   }
 
   /* ================= static bindings ================= */
@@ -72,7 +78,7 @@ class CoupUI {
     this.$('logClose')?.addEventListener('click', () => { this.logPanel.classList.remove('open'); });
     this.$('menuBtn')?.addEventListener('click', () => { Sound.play('click'); this.openGameMenu(); });
     this.$('brandBtn')?.addEventListener('click', () => {
-      if (this.game && !this.game.over) this.openGameMenu();
+      if (document.body.classList.contains('in-game') && this.game && !this.game.over) this.openGameMenu();
     });
 
     this.handEl.addEventListener('click', e => {
@@ -112,12 +118,13 @@ class CoupUI {
 
   /* ================= game boot / table ================= */
 
-  startGame(game) {
+  startGame(game, options = {}) {
     this.game = game;
     this.pods = new Map();
     this.handNodes = [];
     this.selectable = null;
     this.pending = null;
+    this.clearPromptTimer();
     this.modalRoot.innerHTML = '';
     this.modalRoot.classList.remove('open');
     this.bannerLayer.innerHTML = '';
@@ -128,12 +135,12 @@ class CoupUI {
     this.logPanel.classList.remove('open');
     document.querySelectorAll('.confetti').forEach(el => el.remove());
 
-    this.buildTable();
+    this.buildTable({ skipOpeningLog: !!options.skipOpeningLog });
     this.update(game);
     Sound.play('deal');
   }
 
-  buildTable() {
+  buildTable(options = {}) {
     const game = this.game;
     this.opponentsEl.innerHTML = '';
     const opponents = game.players.filter(p => !p.isHuman);
@@ -211,10 +218,12 @@ class CoupUI {
     [...this.pods.values()].forEach(pod => pod.cards.forEach(n => { n.mounted = true; }));
 
     this.lastLogCount = 0;
-    this.addLog({
-      html: `<span class="log-muted">A game of Coup — ${game.players.length} players. Trust no one.</span>`,
-      cls: 'opening'
-    });
+    if (!options.skipOpeningLog) {
+      this.addLog({
+        html: `<span class="log-muted">A game of Coup — ${game.players.length} players. Trust no one.</span>`,
+        cls: 'opening'
+      });
+    }
 
     /* Deal-in animation (classes removed after the cards settle). */
     clearTimeout(this.dealTimer);
@@ -348,20 +357,25 @@ class CoupUI {
   }
 
   updateStatus(game) {
+    const aliveCount = typeof game.alive === 'function'
+      ? game.alive().length
+      : game.players.filter(p => !p.eliminated).length;
     if (game.over) {
       this.statusEyebrow.textContent = 'The court is decided';
       const winner = game.winnerId != null ? game.players[game.winnerId] : null;
+      const secondPerson = winner && (typeof game.isSecondPerson === 'function'
+        ? game.isSecondPerson(winner)
+        : winner.isHuman && winner.name.trim().toLowerCase() === 'you');
       this.statusText.textContent = winner
-        ? (game.isSecondPerson(winner) ? 'You stand alone' : `${winner.name} stands alone`)
+        ? (secondPerson ? 'You stand alone' : `${winner.name} stands alone`)
         : 'Your influence is spent';
       this.statusSub.textContent = 'The dust settles…';
       return;
     }
     const active = game.players[game.turnIndex];
-    const alive = game.players.filter(p => !p.eliminated).length;
     this.statusEyebrow.textContent = active.isHuman ? 'Your move' : `${active.name} is thinking`;
     this.statusText.textContent = active.isHuman ? 'Choose your action' : 'The court waits…';
-    this.statusSub.textContent = `Turn ${game.turnCount} · ${alive} in the court · ${game.deck.length} cards unseen`;
+    this.statusSub.textContent = `Turn ${game.turnCount} · ${aliveCount} in the court · ${game.deck.length} cards unseen`;
     this.youPlate?.classList.toggle('is-turn', active.isHuman);
   }
 
@@ -453,6 +467,7 @@ class CoupUI {
 
   ask(decision) {
     return new Promise(resolve => {
+      this.clearPromptTimer();
       this.pending = { decision, resolve };
       this.selectable = null;
       this.clearSelectable();
@@ -467,18 +482,48 @@ class CoupUI {
         default:
           this.resolve(null);
       }
+      if (this.pending) this.startPromptTimer(decision.timeoutMs);
     });
+  }
+
+  startPromptTimer(ms) {
+    this.clearPromptTimer();
+    if (!ms || ms < 1000 || !this.pending) return;
+    const target = this.dock.querySelector('.dock-inner') || this.modalRoot.querySelector('.modal-panel');
+    if (!target) return;
+    const bar = document.createElement('div');
+    bar.className = 'prompt-timer';
+    bar.innerHTML = '<i></i>';
+    target.append(bar);
+    const fill = bar.firstElementChild;
+    // Force layout before starting the transition.
+    void fill.offsetWidth;
+    requestAnimationFrame(() => {
+      fill.style.transitionDuration = `${ms}ms`;
+      fill.style.width = '0%';
+    });
+    this.promptTimerEl = bar;
+  }
+
+  clearPromptTimer() {
+    if (this.promptTimerEl) {
+      this.promptTimerEl.remove();
+      this.promptTimerEl = null;
+    }
   }
 
   promptStatus(d) {
     const actor = this.game?.players[d.actorId];
     const role = d.role ? CHARACTERS[d.role]?.name : '';
+    const alive = this.game
+      ? (typeof this.game.alive === 'function' ? this.game.alive().length : this.game.players.filter(p => !p.eliminated).length)
+      : 0;
     if (d.kind === 'action') {
       this.statusEyebrow.textContent = 'Your turn';
       this.statusText.textContent = 'Choose your move';
       this.statusSub.textContent = d.mustCoup
         ? 'A coup is mandatory'
-        : `Turn ${this.game.turnCount} · ${this.game.alive().length} in the court`;
+        : `Turn ${this.game.turnCount} · ${alive} in the court`;
     } else if (d.kind === 'challenge') {
       this.statusEyebrow.textContent = 'A claim on the table';
       this.statusText.textContent = 'Challenge or allow?';
@@ -504,6 +549,7 @@ class CoupUI {
     this.pending = null;
     this.selectable = null;
     this.clearSelectable();
+    this.clearPromptTimer();
     this.dock.innerHTML = '';
     this.dock.classList.remove('visible');
     resolve(null);
@@ -515,6 +561,7 @@ class CoupUI {
     this.pending = null;
     this.selectable = null;
     this.clearSelectable();
+    this.clearPromptTimer();
     this.dock.innerHTML = '';
     this.dock.classList.remove('visible');
     if (this.modalRoot.classList.contains('open')) this.closeModal();
@@ -886,6 +933,30 @@ class CoupUI {
   }
 
   openGameMenu() {
+    if (this.mode === 'online') {
+      const html = `<div class="modal-head">
+          <span class="eyebrow">Online table</span>
+          <h2>Leave the room?</h2>
+          <p>Leaving gives up your seat. You can only rejoin while the host keeps the room open.</p>
+          <button class="modal-close" data-close aria-label="Close">${UI_ICONS.close}</button>
+        </div>
+        <div class="menu-actions">
+          <button class="btn btn-primary" data-close>Back to game</button>
+          <button class="btn btn-ghost" id="menuRules">How to play</button>
+          <button class="btn btn-danger" id="menuLeaveOnline">Leave room</button>
+        </div>`;
+      const { panel } = this.openModal(html, { dismissible: true, className: 'modal-panel--small' });
+      panel.querySelector('#menuRules').addEventListener('click', () => {
+        this.closeModal();
+        this.openRules();
+      });
+      panel.querySelector('#menuLeaveOnline').addEventListener('click', () => {
+        this.closeModal();
+        this.handlers.onLeaveOnline?.();
+      });
+      return;
+    }
+
     const html = `<div class="modal-head">
         <span class="eyebrow">The table</span>
         <h2>Leave the court?</h2>
@@ -914,7 +985,7 @@ class CoupUI {
 
   /* ================= game over ================= */
 
-  gameOver(winner, reason) {
+  gameOver(winner, reason, options = {}) {
     const game = this.game;
     setTimeout(() => {
       if (!game || this.game !== game) return;
@@ -957,21 +1028,38 @@ class CoupUI {
         subtitle = 'The court moves on without you.';
       }
 
+      const custom = Array.isArray(options.actions) && options.actions.length ? options.actions : null;
+      const actionsHtml = custom
+        ? custom.map((action, index) => {
+            const cls = action.kind === 'primary' ? 'btn-primary' : action.kind === 'link' ? 'btn-link' : action.kind === 'danger' ? 'btn-danger' : 'btn-ghost';
+            return `<button class="btn ${cls}" data-over-action="${index}">${esc(action.label)}</button>`;
+          }).join('')
+        : `<button class="btn btn-primary" id="overRematch">Play again</button>
+           <button class="btn btn-ghost" id="overMenu">Main menu</button>`;
+
       const html = `<div class="gameover-panel">
         <span class="eyebrow">${eyebrow}</span>
         <h2 class="gameover-title ${humanWon ? 'victory' : ''}">${title}</h2>
         <p class="gameover-sub">${esc(subtitle)}</p>
         <div class="standings">${standing}</div>
-        <div class="gameover-actions">
-          <button class="btn btn-primary" id="overRematch">Play again</button>
-          <button class="btn btn-ghost" id="overMenu">Main menu</button>
-        </div>
+        <div class="gameover-actions ${custom && custom.length > 2 ? 'gameover-actions--multi' : ''}">${actionsHtml}</div>
       </div>`;
 
       const { backdrop, panel } = this.openModal(html, { dismissible: false, className: 'modal-panel--gameover' });
       backdrop.classList.add('gameover-backdrop');
-      panel.querySelector('#overRematch').addEventListener('click', () => { Sound.play('click'); this.closeModal(); this.handlers.onRematch?.(); });
-      panel.querySelector('#overMenu').addEventListener('click', () => { Sound.play('click'); this.closeModal(); this.handlers.onMenu?.(); });
+
+      if (custom) {
+        custom.forEach((action, index) => {
+          panel.querySelector(`[data-over-action="${index}"]`)?.addEventListener('click', () => {
+            Sound.play('click');
+            if (!action.keepOpen) this.closeModal();
+            action.onClick?.();
+          });
+        });
+      } else {
+        panel.querySelector('#overRematch').addEventListener('click', () => { Sound.play('click'); this.closeModal(); this.handlers.onRematch?.(); });
+        panel.querySelector('#overMenu').addEventListener('click', () => { Sound.play('click'); this.closeModal(); this.handlers.onMenu?.(); });
+      }
 
       if (humanWon) {
         Sound.play('win');
@@ -979,7 +1067,19 @@ class CoupUI {
       } else {
         Sound.play('defeat');
       }
-    }, 950);
+    }, options.delay === undefined ? 950 : options.delay);
+  }
+
+  toast(message, tone = 'gold', ms = 2800) {
+    const root = this.$('toastRoot');
+    if (!root) return;
+    const el = document.createElement('div');
+    el.className = `toast toast--${tone}`;
+    el.textContent = message;
+    root.append(el);
+    while (root.children.length > 3) root.firstChild.remove();
+    setTimeout(() => el.classList.add('leaving'), Math.max(300, ms - 380));
+    setTimeout(() => el.remove(), ms);
   }
 
   confetti() {

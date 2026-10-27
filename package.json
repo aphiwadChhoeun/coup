@@ -5,7 +5,14 @@
   "description": "Coup — a game of deception, bluffing and influence. Single-player web board game.",
   "scripts": {
     "start": "node serve.js",
+    "dev": "npm run worker:build && wrangler dev",
+    "worker:build": "node scripts/build-engine.mjs",
+    "deploy": "npm run worker:build && wrangler deploy",
     "test": "node test/sim.js 200 && node test/scenarios.js",
+    "test:online": "node test/online.js",
     "check": "node test/check.js"
+  },
+  "devDependencies": {
+    "wrangler": "^4.153.0"
   }
 }

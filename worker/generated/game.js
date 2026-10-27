@@ -1,3 +1,475 @@
+/* AUTO-GENERATED FILE — do not edit by hand.
+   Source: public/js/cards.js + public/js/ai.js + public/js/engine.js
+   Regenerate with: npm run worker:build
+   The Worker uses this module as the authoritative game engine. */
+
+/* ---- public/js/cards.js ---- */
+/* ============================================================
+   Coup — characters, card artwork, shared helpers
+   ============================================================ */
+
+const ROLES = ['duke', 'assassin', 'captain', 'ambassador', 'contessa'];
+
+const CHARACTERS = {
+  duke: {
+    name: 'Duke',
+    title: 'The Duke',
+    ability: 'Tax',
+    detail: 'Take 3 coins',
+    block: 'Blocks Foreign Aid',
+    accent: '#8a63d2',
+    accentBright: '#cbb2ff',
+    deep: '#22153d',
+    icon: `<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 45 9 22l13.5 10L32 15l9.5 17L55 22l-3 23Z"/>
+      <path d="M12 51h40"/>
+      <circle cx="9" cy="19.5" r="2.4" fill="currentColor" stroke="none"/>
+      <circle cx="32" cy="12" r="2.4" fill="currentColor" stroke="none"/>
+      <circle cx="55" cy="19.5" r="2.4" fill="currentColor" stroke="none"/>
+      <path d="M23 38.5h18" opacity=".55"/>
+      <path d="M32 33.5v5" opacity=".55"/>
+    </svg>`
+  },
+  assassin: {
+    name: 'Assassin',
+    title: 'The Assassin',
+    ability: 'Assassinate',
+    detail: 'Pay 3 · remove an influence',
+    block: '',
+    accent: '#c1425b',
+    accentBright: '#ff9cae',
+    deep: '#390e18',
+    icon: `<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M32 5.5 37 19l-2.2 21h-5.6L27 19Z"/>
+      <path d="M32 11v25" opacity=".45"/>
+      <path d="M21 41h22"/>
+      <path d="M32 41v13.5"/>
+      <path d="M27.5 57.5h9"/>
+      <path d="M24.5 45.5c1.5 2 4 2 5.5 1M39.5 45.5c-1.5 2-4 2-5.5 1" opacity=".45"/>
+    </svg>`
+  },
+  captain: {
+    name: 'Captain',
+    title: 'The Captain',
+    ability: 'Steal',
+    detail: 'Take 2 coins from a rival',
+    block: 'Blocks Stealing',
+    accent: '#2f879b',
+    accentBright: '#99ebf7',
+    deep: '#082b34',
+    icon: `<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="32" cy="12" r="6"/>
+      <path d="M32 18v34"/>
+      <path d="M20 26h24"/>
+      <path d="M14 41c0 11 8.5 17 18 17s18-6 18-17"/>
+      <path d="M14 41l-4-1.5L13 47M50 41l4-1.5L51 47"/>
+      <path d="M26 20.5h12" opacity=".5"/>
+    </svg>`
+  },
+  ambassador: {
+    name: 'Ambassador',
+    title: 'The Ambassador',
+    ability: 'Exchange',
+    detail: 'Swap cards with the Court',
+    block: 'Blocks Stealing',
+    accent: '#4d9567',
+    accentBright: '#b6efc2',
+    deep: '#0d2b1e',
+    icon: `<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 13h27c3 0 5 2.4 5 5.4V46c0 3.2-2.2 5.5-5.4 5.5H20c-3.5 0-6-2.4-6-5.8V22"/>
+      <path d="M14 22c0-4.8 2.6-9 8-9"/>
+      <path d="M18 13v9h8"/>
+      <path d="M23 25h17M23 32h17M23 39h11"/>
+      <circle cx="43" cy="45" r="5.2" fill="currentColor" fill-opacity=".18"/>
+      <path d="M41 45h4M43 43v4" opacity=".8"/>
+    </svg>`
+  },
+  contessa: {
+    name: 'Contessa',
+    title: 'The Contessa',
+    ability: 'Counter',
+    detail: 'Blocks an assassination',
+    block: '',
+    accent: '#b45a7c',
+    accentBright: '#ffc2d6',
+    deep: '#3a1422',
+    icon: `<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M32 8c-8.6 0-15 6-15 13.4 0 7.7 6.6 12.6 15 12.6s15-4.9 15-12.6C47 14 40.6 8 32 8Z"/>
+      <path d="M23 20c1.8-4.2 5.6-6.4 9.5-5.2 4 1.2 5.4 6 2.8 8.6-2.6 2.6-8.6 2-10.8-1.4-1.5-2.3-1-4.5.5-5.8"/>
+      <path d="M32 34v22"/>
+      <path d="M32 42c-8-2-12.8 2-15 9 8.6 2.4 13.2-1.8 15-9Z"/>
+      <path d="M32 48c7-1.8 11.4 1.4 13.4 7.6-7.8 2.2-12-1.4-13.4-7.6Z"/>
+      <path d="M32 37c-5-3-9-2-12 1M32 40c4-2.4 7.4-1.6 9.6.6" opacity=".5"/>
+    </svg>`
+  }
+};
+
+/* Classic script friendly card face markup. */
+function cardFrontHTML(role, extraClass = '') {
+  const c = CHARACTERS[role];
+  if (!c) return '';
+  return `<div class="card-front ${extraClass}" style="--accent:${c.accent};--accent-bright:${c.accentBright};--accent-deep:${c.deep}">
+    <div class="cf-wash"></div>
+    <div class="cf-frame"></div>
+    <span class="cf-corner cf-corner--tl">✦</span>
+    <span class="cf-corner cf-corner--br">✦</span>
+    <div class="cf-crest">${c.icon}</div>
+    <div class="cf-name">${c.name}</div>
+    <div class="cf-rule"><i></i><span>✦</span><i></i></div>
+    <div class="cf-ability"><b>${c.ability}</b><span>${c.detail}</span></div>
+    ${c.block ? `<div class="cf-block">${c.block}</div>` : `<div class="cf-block cf-block--empty">Influence</div>`}
+  </div>`;
+}
+
+function cardBackHTML() {
+  return `<div class="card-back">
+    <div class="cb-lattice"></div>
+    <div class="cb-ring"></div>
+    <div class="cb-sigil">
+      <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M16 42 13 24l10.5 8L32 19l8.5 13L51 24l-3 18Z"/>
+        <path d="M16 47h32"/>
+        <circle cx="32" cy="16" r="1.8" fill="currentColor" stroke="none"/>
+      </svg>
+    </div>
+    <div class="cb-word">COUP</div>
+    <div class="cb-stars">✦</div>
+  </div>`;
+}
+
+function roleIcon(role) {
+  return CHARACTERS[role] ? CHARACTERS[role].icon : '';
+}
+
+/* Shared small helpers */
+function esc(str) {
+  return String(str).replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  })[ch]);
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function shuffleCopy(arr) {
+  return shuffle(arr.slice());
+}
+
+
+/* ---- public/js/ai.js ---- */
+/* ============================================================
+   Coup — AI opponents
+   Sees only public information plus its own hand.
+   ============================================================ */
+
+const DIFFICULTY = {
+  easy:   { key: 'easy',   challenge: 0.25, think: [280, 540], mistake: 0.22 },
+  normal: { key: 'normal', challenge: 0.37, think: [360, 680], mistake: 0.08 },
+  hard:   { key: 'hard',   challenge: 0.49, think: [330, 600], mistake: 0.02 }
+};
+
+const ROLE_KEEP_VALUE = {
+  duke: 3.0,
+  captain: 2.8,
+  assassin: 2.6,
+  contessa: 2.35,
+  ambassador: 2.05
+};
+
+class CoupAI {
+  constructor(profile = {}, difficulty = 'normal') {
+    this.p = {
+      bluff: 0.5,
+      skeptic: 0.5,
+      aggression: 0.5,
+      ...profile
+    };
+    this.diff = DIFFICULTY[difficulty] || DIFFICULTY.normal;
+  }
+
+  async decide(d) {
+    const [lo, hi] = this.diff.think;
+    await sleep(lo + Math.random() * (hi - lo));
+    switch (d.kind) {
+      case 'action': return this.chooseAction(d);
+      case 'challenge': return this.chooseChallenge(d);
+      case 'block': return this.chooseBlock(d);
+      case 'loseInfluence': return this.chooseLoseInfluence(d);
+      case 'exchange': return this.chooseExchange(d);
+      default: return null;
+    }
+  }
+
+  /* ---------- probability: does the actor hold this role? ---------- */
+
+  roleProbability(role, actorHidden, view) {
+    let revealed = 0;
+    for (const p of view.players) {
+      revealed += p.revealed.filter(r => r === role).length;
+    }
+    const mine = view.me.hidden.filter(r => r === role).length;
+    const remaining = Math.max(0, 3 - revealed - mine);
+    if (remaining === 0 || actorHidden === 0) return 0;
+
+    const unknown = view.players
+      .filter(p => p.id !== view.me.id)
+      .reduce((sum, p) => sum + p.hiddenCount, 0) + view.deckCount;
+    if (unknown <= 0) return 0;
+
+    let none = 1;
+    for (let i = 0; i < remaining; i++) {
+      const numerator = Math.max(0, unknown - actorHidden - i);
+      const denominator = unknown - i;
+      none *= denominator > 0 ? numerator / denominator : 0;
+    }
+    return Math.max(0, Math.min(1, 1 - none));
+  }
+
+  /* ---------- action selection ---------- */
+
+  chooseAction(d) {
+    const view = d.view;
+    const me = view.me;
+    const others = view.players.filter(p => p.id !== me.id && !p.eliminated);
+    if (!others.length) return null;
+
+    const available = d.actions.filter(a => a.enabled !== false);
+    if (!available.length) return { type: 'coup', targetId: others[0].id };
+
+    if (d.mustCoup) {
+      return { type: 'coup', targetId: this.pickTarget(others, 'coup') };
+    }
+
+    const has = role => me.hidden.includes(role);
+    const influence = me.hidden.length;
+
+    const coupTarget = this.pickTarget(others, 'coup');
+    const strikeTarget = this.pickTarget(others, 'strike');
+    const stealTargetPlayer = others.slice().sort((a, b) =>
+      (b.coins * 5 + Math.random() * 3) - (a.coins * 5 + Math.random() * 3)
+    )[0];
+    const richest = others.reduce((m, p) => Math.max(m, p.coins), 0);
+    const maxHidden = others.reduce((m, p) => Math.max(m, p.hiddenCount), 0);
+    const endgame = others.length === 1;
+
+    const bluffCost = (role) => {
+      if (has(role)) return 0;
+      return 9 + (influence === 1 ? 9 : 0) - this.p.bluff * 8;
+    };
+
+    let best = null;
+    for (const action of available) {
+      let score = 0;
+      let targetId = null;
+
+      switch (action.type) {
+        case 'income':
+          score = 20 + (me.coins <= 3 ? 4 : 0);
+          if (endgame && me.coins >= 6 && me.coins < 7) score += 8;
+          break;
+
+        case 'foreignAid':
+          score = 29 + (me.coins < 7 ? 5 : 0);
+          // Someone likely holds a Duke to block.
+          score -= 4 + this.diff.challenge * 5;
+          if (influence === 1) score -= 2;
+          break;
+
+        case 'coup':
+          score = 120;
+          targetId = coupTarget;
+          break;
+
+        case 'tax':
+          score = 40 + (me.coins < 7 ? 6 : 0) + (has('duke') ? 13 : 0) - bluffCost('duke');
+          // Coins in hand are leverage; build toward an unblockable coup.
+          if (me.coins >= 4) score += 14;
+          if (me.coins >= 6) score += 8;
+          if (endgame && me.coins < 7) score += 10;
+          break;
+
+        case 'assassinate': {
+          score = 44 + (has('assassin') ? 12 : 0) - bluffCost('assassin');
+          targetId = strikeTarget;
+          const t = others.find(p => p.id === strikeTarget);
+          if (t) {
+            if (t.hiddenCount === 1) score += 20;
+            if (t.coins >= 6) score += 5;
+            // A target who keeps claiming Contessa is a poor assassination target.
+            const risk = this.blockRisk('contessa', t, view);
+            score -= risk * 52;
+            if (risk > 0.55) score -= 12;
+          }
+          if (me.coins >= 4 && me.coins < 7) score -= 14;
+          score += this.p.aggression * 8;
+          break;
+        }
+
+        case 'steal': {
+          score = 31 + (has('captain') ? 10 : 0) - bluffCost('captain');
+          targetId = stealTargetPlayer ? stealTargetPlayer.id : null;
+          if (richest < 2) score -= 18;
+          else score += Math.min(stealValue(stealTargetPlayer), 2) * 3;
+          if (maxHidden === 1) score -= 3;
+          break;
+        }
+
+        case 'exchange':
+          score = 21 + (has('ambassador') ? 7 : 0) - bluffCost('ambassador') * 0.5;
+          if (influence === 1) score -= 3;
+          break;
+      }
+
+      score += (Math.random() - 0.5) * 9;
+      if (this.diff.key === 'easy') score += (Math.random() - 0.5) * 10;
+
+      if (!best || score > best.score) best = { score, type: action.type, targetId };
+    }
+
+    if (!best) return { type: available[0].type, targetId: available[0].target ? coupTarget : null };
+    if (!ACTIONS[best.type].target) best.targetId = null;
+    return { type: best.type, targetId: best.targetId };
+
+    function stealValue(p) {
+      return p ? Math.min(2, p.coins) : 0;
+    }
+  }
+
+  /* How likely is this player to hold (and play) the role as a block? */
+  blockRisk(role, target, view) {
+    const base = this.roleProbability(role, target.hiddenCount, view);
+    const recent = view.claims.filter(c =>
+      c.playerId === target.id &&
+      c.kind === 'block' &&
+      c.role === role &&
+      view.turnCount - c.turn <= 10
+    );
+    if (!recent.length) return base;
+    const claimed = Math.min(0.92, 0.35 + recent.length * 0.14);
+    return Math.max(base, claimed);
+  }
+
+  pickTarget(players, mode) {
+    let best = null;
+    for (const p of players) {
+      let score = 0;
+      if (mode === 'steal') {
+        score = p.coins * 5;
+      } else {
+        score = p.coins * 1.2 + p.hiddenCount * 2;
+        if (p.hiddenCount === 1) score += 26;
+        if (p.isHuman) score += 2;
+        if (this.p.aggression > 0.6) score += Math.random() * 3;
+      }
+      score += Math.random() * 6;
+      if (!best || score > best.score) best = { score, id: p.id };
+    }
+    return best ? best.id : null;
+  }
+
+  /* ---------- challenges ---------- */
+
+  chooseChallenge(d) {
+    const view = d.view;
+    const actor = view.players.find(p => p.id === d.actorId);
+    if (!actor) return false;
+
+    const p = this.roleProbability(d.role, actor.hiddenCount, view);
+    let threshold = this.diff.challenge + (this.p.skeptic - 0.5) * 0.22;
+
+    if (d.claimKind === 'block') threshold += 0.025;
+    if (view.me.hidden.length === 1) threshold -= 0.055;
+    threshold += this.p.aggression * 0.035;
+
+    const caughtRecently = view.claims.some(c =>
+      c.playerId === d.actorId && c.held === false && view.turnCount - c.turn <= 6
+    );
+    if (caughtRecently) threshold += 0.025;
+
+    if (this.diff.key === 'easy') threshold -= 0.02;
+    if (this.diff.key === 'hard') threshold += 0.015;
+
+    const roll = p + (Math.random() - 0.5) * 0.045;
+    return roll < threshold;
+  }
+
+  /* ---------- blocks ---------- */
+
+  chooseBlock(d) {
+    const me = d.view.me;
+    const held = d.roles.filter(r => me.hidden.includes(r));
+
+    if (held.length) {
+      // Claim a role actually held. Prefer one whose active power matters less.
+      return held[Math.floor(Math.random() * held.length)];
+    }
+
+    const influence = me.hidden.length;
+    let chance = 0.08 + this.p.bluff * 0.2;
+
+    if (d.action === 'foreignAid') {
+      chance *= 0.32;
+    } else if (d.action === 'assassinate') {
+      chance = influence === 1
+        ? 0.58 + this.p.bluff * 0.28
+        : 0.15 + this.p.bluff * 0.16;
+    } else if (d.action === 'steal') {
+      chance = 0.06 + this.p.bluff * 0.14;
+    }
+
+    if (this.diff.key === 'easy') chance *= 0.7;
+    if (this.diff.key === 'hard') chance *= 1.15;
+
+    if (Math.random() < chance) {
+      // Bluff with the role that is statistically likeliest to be believed.
+      return d.roles[Math.floor(Math.random() * d.roles.length)];
+    }
+    return null;
+  }
+
+  /* ---------- influence selection ---------- */
+
+  chooseLoseInfluence(d) {
+    const view = d.view;
+    const lastClaim = [...view.claims].reverse().find(c => c.playerId === view.me.id);
+    let worst = null;
+
+    for (const option of d.options) {
+      let keep = ROLE_KEEP_VALUE[option.role] || 2;
+      if (lastClaim && lastClaim.role === option.role) keep += 1.1;
+      keep += Math.random() * 0.35;
+      if (option.role === 'contessa' && view.me.hidden.length === 1) keep += 0.3;
+      if (!worst || keep < worst.keep) worst = { keep, index: option.index };
+    }
+
+    return worst ? worst.index : d.options[0].index;
+  }
+
+  chooseExchange(d) {
+    const view = d.view;
+    const lastClaim = [...view.claims].reverse().find(c => c.playerId === view.me.id);
+    const scored = d.options.map((option, index) => {
+      let value = ROLE_KEEP_VALUE[option.role] || 2;
+      if (lastClaim && lastClaim.role === option.role) value += 0.9;
+      value += Math.random() * 0.5;
+      return { index, value };
+    });
+    scored.sort((a, b) => b.value - a.value);
+    return scored.slice(0, d.keepCount).map(s => s.index);
+  }
+}
+
+
+/* ---- public/js/engine.js ---- */
 /* ============================================================
    Coup — game engine
    Pure rules + async decision flow. No DOM here.
@@ -107,6 +579,8 @@ class CoupGame {
   }
 
   isSecondPerson(player) {
+    if (!player) return false;
+    if (typeof player.secondPerson === 'boolean') return player.secondPerson;
     return !!player.isHuman && player.name.trim().toLowerCase() === 'you';
   }
 
@@ -160,7 +634,15 @@ class CoupGame {
       kind: 'action',
       actions,
       mustCoup,
-      targets: this.players.filter(p => !p.eliminated && p.id !== player.id)
+      // Public target information only: prompts can cross the network in online play.
+      targets: this.players
+        .filter(p => !p.eliminated && p.id !== player.id)
+        .map(p => ({
+          id: p.id,
+          name: p.name,
+          coins: p.coins,
+          hiddenCount: p.cards.filter(c => !c.revealed).length
+        }))
     });
     if (this.over) return;
     await this.doAction(player, choice);
@@ -686,3 +1168,17 @@ class CoupGame {
     return agent.decide(decision);
   }
 }
+
+
+export {
+  ROLES,
+  CHARACTERS,
+  CoupGame,
+  CoupAI,
+  cardFrontHTML,
+  cardBackHTML,
+  roleIcon,
+  esc,
+  shuffle,
+  sleep
+};

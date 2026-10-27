@@ -39,6 +39,18 @@
   const state = { count: 4, diff: 'normal' };
   const $ = id => document.getElementById(id);
 
+  /* ---------------- online controller ---------------- */
+
+  const online = new CoupOnline({
+    ui,
+    getTitleName: () => $('nameInput').value,
+    setTitleName: name => { $('nameInput').value = name; },
+    onShowOnline: showOnlineScreen,
+    onEnterGame: enterOnlineGame,
+    onEnterLobby: enterOnlineLobby,
+    onExit: exitOnline
+  });
+
   /* ---------------- title decorations ---------------- */
 
   function buildGhostCards() {
@@ -112,6 +124,10 @@
     $('nameInput').addEventListener('keydown', e => {
       if (e.key === 'Enter') startGame();
     });
+    $('onlineBtn')?.addEventListener('click', () => {
+      Sound.play('click');
+      online.openEntry();
+    });
     document.addEventListener('pointerdown', () => Sound.init(), { once: true });
   }
 
@@ -160,15 +176,75 @@
 
     document.body.classList.add('in-game');
     $('screen-title').classList.add('hidden');
+    $('screen-online').classList.add('hidden');
     $('screen-game').classList.remove('hidden');
     $('logPanel').classList.remove('open');
 
+    ui.setMode('solo');
     ui.setHandlers({
       onRematch: () => startGame(),
       onMenu: () => showMenu()
     });
     ui.startGame(game);
     game.start();
+  }
+
+  /* ---------------- online screens ---------------- */
+
+  function showOnlineScreen() {
+    if (currentGame) {
+      currentGame.abort();
+      ui.cancelPending();
+      currentGame = null;
+    }
+    gameToken++;
+    ui.closeModal();
+    ui.cancelPending();
+    document.body.classList.remove('in-game');
+    $('screen-title').classList.add('hidden');
+    $('screen-game').classList.add('hidden');
+    $('screen-online').classList.remove('hidden');
+    $('logPanel').classList.remove('open');
+    ui.setMode('online');
+  }
+
+  function enterOnlineGame() {
+    document.body.classList.add('in-game');
+    $('screen-title').classList.add('hidden');
+    $('screen-online').classList.add('hidden');
+    $('screen-game').classList.remove('hidden');
+    $('logPanel').classList.remove('open');
+  }
+
+  function enterOnlineLobby() {
+    document.body.classList.remove('in-game');
+    $('screen-title').classList.add('hidden');
+    $('screen-game').classList.add('hidden');
+    $('screen-online').classList.remove('hidden');
+    $('logPanel').classList.remove('open');
+    document.querySelectorAll('.confetti').forEach(el => el.remove());
+    ui.closeModal();
+    ui.setMode('online');
+  }
+
+  function exitOnline() {
+    document.body.classList.remove('in-game');
+    $('screen-online').classList.add('hidden');
+    $('screen-game').classList.add('hidden');
+    $('screen-title').classList.remove('hidden');
+    ui.setMode('solo');
+    ui.setHandlers({
+      onRematch: () => startGame(),
+      onMenu: () => showMenu()
+    });
+    try {
+      const url = new URL(location.href);
+      if (url.searchParams.has('room')) {
+        url.searchParams.delete('room');
+        history.replaceState(null, '', url);
+      }
+    } catch (e) { /* ignore */ }
+    paintSegments();
   }
 
   function showMenu() {
@@ -185,7 +261,9 @@
     document.querySelectorAll('.confetti').forEach(el => el.remove());
     document.body.classList.remove('in-game');
     $('screen-game').classList.add('hidden');
+    $('screen-online').classList.add('hidden');
     $('screen-title').classList.remove('hidden');
+    ui.setMode('solo');
     paintSegments();
     Sound.play('click');
   }
@@ -197,6 +275,11 @@
     loadSettings();
     paintSegments();
     bindSetup();
+
+    const room = new URLSearchParams(location.search).get('room');
+    if (room) {
+      setTimeout(() => online.openEntry(room), 80);
+    }
   }
 
   if (document.readyState === 'loading') {
@@ -213,5 +296,6 @@
       showMenu,
       get game() { return currentGame; }
     };
+    window.__coupOnline = online;
   }
 })();

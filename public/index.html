@@ -91,10 +91,26 @@
           <span>Take a seat</span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </button>
-        <button class="btn btn-link" id="titleRulesBtn">How to play</button>
+        <div class="setup-links">
+          <button class="btn btn-link" id="titleRulesBtn">How to play</button>
+          <span class="setup-dot" aria-hidden="true">✦</span>
+          <button class="btn btn-link" id="onlineBtn">Play online</button>
+        </div>
       </section>
 
       <p class="title-foot">3–6 players · Two coins · Two secrets · One survivor</p>
+    </div>
+  </main>
+
+  <!-- ================= online lobby ================= -->
+  <main id="screen-online" class="screen online-screen hidden">
+    <div class="online-shell">
+      <button id="onlineBack" class="back-link" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m14 6-6 6 6 6"/></svg>
+        <span>Back</span>
+      </button>
+      <div id="onlinePanel" class="online-panel"></div>
+      <p class="online-foot">Private rooms, hosted on Cloudflare. No accounts, no installs.</p>
     </div>
   </main>
 
@@ -168,6 +184,7 @@
   </main>
 
   <div id="modalRoot" class="modal-root"></div>
+  <div id="netBar" class="net-bar hidden" role="status" aria-live="polite"></div>
   <div id="toastRoot" class="toast-root" aria-live="polite"></div>
 
   <script src="js/cards.js"></script>
@@ -175,6 +192,7 @@
   <script src="js/engine.js"></script>
   <script src="js/sound.js"></script>
   <script src="js/ui.js"></script>
+  <script src="js/online.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

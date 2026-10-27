@@ -5,7 +5,7 @@ const path = require('path');
 const vm = require('vm');
 
 const root = path.join(__dirname, '..');
-const files = ['js/cards.js', 'js/ai.js', 'js/engine.js'];
+const files = ['public/js/cards.js', 'public/js/ai.js', 'public/js/engine.js'];
 const source = files.map(f => fs.readFileSync(path.join(root, f), 'utf8')).join('\n');
 
 const sandbox = {

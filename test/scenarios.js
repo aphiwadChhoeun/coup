@@ -5,7 +5,7 @@ const path = require('path');
 const vm = require('vm');
 
 const root = path.join(__dirname, '..');
-const source = ['js/cards.js', 'js/ai.js', 'js/engine.js']
+const source = ['public/js/cards.js', 'public/js/ai.js', 'public/js/engine.js']
   .map(f => fs.readFileSync(path.join(root, f), 'utf8')).join('\n');
 
 const sandbox = { console, setTimeout, clearTimeout, Promise, Math, Set, Map, Number, Array, Object, String, JSON };

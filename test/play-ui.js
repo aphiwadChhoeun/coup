@@ -9,6 +9,7 @@ const path = require('path');
 const CHROME = process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const width = Number(process.argv[2] || 1440);
 const height = Number(process.argv[3] || 900);
+const targetUrl = process.env.COUP_URL || 'http://localhost:3000';
 const port = 9700 + Math.floor(Math.random() * 200);
 const profile = path.join(os.tmpdir(), `coup-ui-${Date.now()}-${Math.random().toString(16).slice(2)}`);
 const outDir = path.resolve('shots');
@@ -78,7 +79,7 @@ async function main() {
   await send('Page.enable');
   await send('Runtime.enable');
   await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: width < 600 });
-  await send('Page.navigate', { url: 'http://localhost:4173' });
+  await send('Page.navigate', { url: targetUrl });
   for (let i = 0; i < 100; i++) {
     if (await evaluate('document.readyState') === 'complete') break;
     await sleep(100);

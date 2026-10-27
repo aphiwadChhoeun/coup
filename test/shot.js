@@ -15,7 +15,7 @@ for (const arg of process.argv.slice(2)) {
 const CHROME = process.env.CHROME || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 const width = Number(args.width || 1440);
 const height = Number(args.height || 900);
-const url = args.url || 'http://localhost:4173';
+const url = args.url || 'http://localhost:3000';
 const out = path.resolve(args.out || 'shots/shot.png');
 const wait = Number(args.wait || 1500);
 const script = args.script ? fs.readFileSync(path.resolve(args.script), 'utf8') : null;
